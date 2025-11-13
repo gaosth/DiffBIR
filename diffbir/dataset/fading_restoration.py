@@ -344,20 +344,35 @@ class FadingRestorationDataset(data.Dataset):
 
     def _apply_darkening(self, image: np.ndarray, darken_strength: float,
                         use_overlay: bool, overlay_opacity: float) -> np.ndarray:
-        """
-        应用变暗老化
-
-        使用直接的线性变暗而不是HSV转换，以避免颜色偏移
-        """
+        """应用变暗老化"""
         # 如果darken_strength为0，跳过所有处理
         if darken_strength == 0.0:
             return image
 
         result = image.astype(np.float32)
 
-        # 直接线性变暗（所有通道同比例降低，保持颜色不变）
-        # 这比HSV转换更精确，不会引入颜色偏移
-        result = result * (1 - darken_strength)
+        if use_overlay:
+            # 组合模式：HSV + 棕色叠加
+            # 修复：不除以255，直接用0-255范围转换
+            hsv = cv2.cvtColor(result.astype(np.uint8), cv2.COLOR_BGR2HSV).astype(np.float32)
+            # OpenCV的HSV范围: H[0-180], S[0-255], V[0-255]
+            hsv[:, :, 2] = hsv[:, :, 2] * (1 - darken_strength * 0.4)
+            hsv[:, :, 1] = hsv[:, :, 1] * 1.2
+            hsv = np.clip(hsv, 0, 255)
+            result = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR).astype(np.float32)
+
+            # 棕色叠加
+            brown_color = np.array([15, 49, 80], dtype=np.float32)
+            brown_layer = np.ones_like(result) * brown_color
+            adjusted_opacity = overlay_opacity * 0.85
+            result = result * (1 - adjusted_opacity) + brown_layer * adjusted_opacity
+        else:
+            # 纯HSV方法
+            hsv = cv2.cvtColor(result.astype(np.uint8), cv2.COLOR_BGR2HSV).astype(np.float32)
+            hsv[:, :, 2] = hsv[:, :, 2] * (1 - darken_strength)
+            hsv[:, :, 1] = hsv[:, :, 1] * 1.2
+            hsv = np.clip(hsv, 0, 255)
+            result = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR).astype(np.float32)
 
         return np.clip(result, 0, 255)
 
