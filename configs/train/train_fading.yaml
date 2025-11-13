@@ -103,7 +103,11 @@ dataset:
         crack_density: 0.3
         crack_thickness: 1
         crack_type: 'light'
-        decay_range: [0.5, 0.7]
+        # decay_range: 色彩衰减范围 [min, max]
+        #   [0.5, 0.7] - 强衰减，图片会明显变暗
+        #   [0.8, 0.95] - 中度衰减（推荐）
+        #   [0.95, 1.0] - 轻微衰减，几乎保持原样
+        decay_range: [0.8, 0.95]  # 中度衰减
         noise_level: 10
         num_stains: 5
         # aging_type选项：

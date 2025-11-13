@@ -40,7 +40,7 @@ def test_dataset(image_dir, prompt_csv, num_samples=5, use_brown_overlay=False,
         'crack_density': 0.3,
         'crack_thickness': 1,
         'crack_type': 'light',
-        'decay_range': (0.5, 0.7),
+        'decay_range': (0.95, 1.0),  # 接近1.0：几乎不衰减，保持原始亮度
         'noise_level': 10,
         'num_stains': 5,
         'aging_type': 'darken',   # 改为'darken'：只应用变暗+棕色叠加，不应用褪色效果
