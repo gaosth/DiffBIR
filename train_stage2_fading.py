@@ -159,9 +159,8 @@ def main(args) -> None:
                 z_0 = pure_cldm.vae_encode(gt)
 
                 # 关键改动：直接使用褪色图片（lq）作为条件
-                # 将lq从[0,1]范围转换到[-1,1]范围以匹配VAE的输入要求
-                lq_normalized = lq * 2 - 1
-                cond = pure_cldm.prepare_condition(lq_normalized, prompt)
+                # 注意：prepare_condition内部会自动做*2-1转换，这里直接传入[0,1]范围的lq
+                cond = pure_cldm.prepare_condition(lq, prompt)
 
                 # noise augmentation（可选）
                 cond_aug = copy.deepcopy(cond)
