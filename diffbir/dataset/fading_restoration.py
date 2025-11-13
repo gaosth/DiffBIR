@@ -221,6 +221,10 @@ class FadingRestorationDataset(data.Dataset):
         """
         综合退化函数（简化版本，只包含核心效果）
         为了训练效率，这里只应用最重要的褪色效果
+
+        注意：处理顺序很重要！
+        - 色彩衰减会降低所有通道的值
+        - 棕色叠加要在色彩衰减之后，否则效果会被削弱
         """
         result = image.copy().astype(np.float32)
 
@@ -234,19 +238,26 @@ class FadingRestorationDataset(data.Dataset):
                 sepia=params['sepia']
             )
 
-        # 2. 应用变暗老化
+        # 2. 应用变暗老化 (HSV部分，不包括棕色叠加)
         if params['aging_type'] in ['darken', 'both']:
             result = self._apply_darkening(
                 result,
                 darken_strength=params['darken_strength'],
-                use_overlay=params['use_brown_overlay'],
+                use_overlay=False,  # 先不应用棕色叠加
                 overlay_opacity=params['overlay_opacity']
             )
 
-        # 3. 非均匀色彩衰减
+        # 3. 非均匀色彩衰减 (会降低所有通道)
         result = self._apply_color_decay(result, params['decay_range'])
 
-        # 4. 添加噪声
+        # 4. 现在应用棕色叠加 (在色彩衰减之后，保持效果)
+        if params['aging_type'] in ['darken', 'both'] and params['use_brown_overlay']:
+            result = self._apply_brown_overlay_only(
+                result,
+                overlay_opacity=params['overlay_opacity']
+            )
+
+        # 5. 添加噪声
         if params['noise_level'] > 0:
             result = self._add_noise(result, params['noise_level'])
 
@@ -282,6 +293,29 @@ class FadingRestorationDataset(data.Dataset):
             img_float = img_float * (1 - sepia) + sepia_img * sepia
 
         return np.clip(img_float * 255, 0, 255)
+
+    def _apply_brown_overlay_only(self, image: np.ndarray, overlay_opacity: float) -> np.ndarray:
+        """
+        只应用棕色叠加效果（不做HSV预处理）
+        应该在色彩衰减之后调用，以保持效果
+
+        Args:
+            image: 输入图像，范围[0, 255]，float32
+            overlay_opacity: 叠加不透明度
+
+        Returns:
+            应用棕色叠加后的图像
+        """
+        result = image.astype(np.float32)
+
+        # 棕色叠加 (#50310f -> BGR: [15, 49, 80])
+        brown_color = np.array([15, 49, 80], dtype=np.float32)
+        brown_layer = np.ones_like(result) * brown_color
+
+        # 直接应用，不降低不透明度
+        result = result * (1 - overlay_opacity) + brown_layer * overlay_opacity
+
+        return np.clip(result, 0, 255)
 
     def _apply_darkening(self, image: np.ndarray, darken_strength: float,
                         use_overlay: bool, overlay_opacity: float) -> np.ndarray:
