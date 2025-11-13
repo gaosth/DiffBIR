@@ -1,0 +1,154 @@
+# Stage2训练配置 - 褪色图片修复
+# 用于训练ControlNet来修复褪色的古画
+
+model:
+  cldm:
+    target: diffbir.model.cldm.ControlLDM
+    params:
+      latent_scale_factor: 0.18215
+      unet_cfg:
+        use_checkpoint: True
+        image_size: 32 # unused
+        in_channels: 4
+        out_channels: 4
+        model_channels: 320
+        attention_resolutions: [ 4, 2, 1 ]
+        num_res_blocks: 2
+        channel_mult: [ 1, 2, 4, 4 ]
+        num_head_channels: 64
+        use_spatial_transformer: True
+        use_linear_in_transformer: True
+        transformer_depth: 1
+        context_dim: 1024
+        legacy: False
+      vae_cfg:
+        embed_dim: 4
+        ddconfig:
+          double_z: true
+          z_channels: 4
+          resolution: 256
+          in_channels: 3
+          out_ch: 3
+          ch: 128
+          ch_mult:
+          - 1
+          - 2
+          - 4
+          - 4
+          num_res_blocks: 2
+          attn_resolutions: []
+          dropout: 0.0
+      clip_cfg:
+        embed_dim: 1024
+        vision_cfg:
+          image_size: 224
+          layers: 32
+          width: 1280
+          head_width: 80
+          patch_size: 14
+        text_cfg:
+          context_length: 77
+          vocab_size: 49408
+          width: 1024
+          heads: 16
+          layers: 24
+        layer: "penultimate"
+      controlnet_cfg:
+        use_checkpoint: True
+        image_size: 32 # unused
+        in_channels: 4
+        hint_channels: 4
+        model_channels: 320
+        attention_resolutions: [ 4, 2, 1 ]
+        num_res_blocks: 2
+        channel_mult: [ 1, 2, 4, 4 ]
+        num_head_channels: 64
+        use_spatial_transformer: True
+        use_linear_in_transformer: True
+        transformer_depth: 1
+        context_dim: 1024
+        legacy: False
+
+  diffusion:
+    target: diffbir.model.gaussian_diffusion.Diffusion
+    params:
+      linear_start: 0.00085
+      linear_end: 0.0120
+      timesteps: 1000
+      zero_snr: False
+      parameterization: eps
+
+dataset:
+  train:
+    target: diffbir.dataset.fading_restoration.FadingRestorationDataset
+    params:
+      # 原始高质量图片目录（1000张褪色前的图片）
+      image_dir: /path/to/your/original_images
+      # CSV文件路径，包含filename和prompt
+      prompt_csv: /path/to/your/image_prompts.csv
+      # 输出图片尺寸
+      out_size: 512
+      # 裁剪类型：center, random, none
+      crop_type: center
+      # 是否随机化褪色参数以增加多样性
+      random_fading: true
+      # 褪色参数（如果random_fading=true，这些值会作为参考范围）
+      fading_params:
+        saturation: 0.6
+        brightness: 1.4
+        yellow: 0.6
+        sepia: 0.4
+        crack_density: 0.3
+        crack_thickness: 1
+        crack_type: 'light'
+        decay_range: [0.5, 0.7]
+        noise_level: 10
+        num_stains: 5
+        aging_type: 'both'
+        darken_strength: 0.3
+        use_brown_overlay: false
+        overlay_opacity: 0.65
+
+batch_transform:
+  target: diffbir.dataset.batch_transform.IdentityBatchTransform
+
+train:
+  # Stable Diffusion v2.1预训练权重路径
+  # 下载地址: https://huggingface.co/stabilityai/stable-diffusion-2-1-base
+  sd_path: /path/to/stable-diffusion-2-1-base/v2-1_512-ema-pruned.ckpt
+
+  # 实验输出目录
+  exp_dir: experiments/fading_restoration
+
+  # 学习率
+  learning_rate: 1e-4
+
+  # 批次大小（根据你的GPU显存调整）
+  # 1000张图片的小数据集，建议使用较小的batch size
+  batch_size: 4
+
+  # 数据加载workers数量
+  num_workers: 4
+
+  # 训练步数
+  # 对于1000张图片，建议训练较多轮次
+  # 1000图片 / 4 batch_size = 250 steps/epoch
+  # 建议训练50-100 epochs，即 12500-25000 steps
+  train_steps: 20000
+
+  # 日志记录间隔
+  log_every: 50
+
+  # checkpoint保存间隔
+  ckpt_every: 2000
+
+  # 图像记录间隔
+  image_every: 500
+
+  # 从checkpoint恢复训练（可选）
+  resume: ~
+
+  # 条件噪声增强时间步
+  # 设置为0表示不使用噪声增强
+  # 可以尝试50-100来增加训练的鲁棒性
+  noise_aug_timestep: 0
