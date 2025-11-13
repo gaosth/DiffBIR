@@ -344,33 +344,20 @@ class FadingRestorationDataset(data.Dataset):
 
     def _apply_darkening(self, image: np.ndarray, darken_strength: float,
                         use_overlay: bool, overlay_opacity: float) -> np.ndarray:
-        """应用变暗老化"""
-        # 如果darken_strength为0，跳过所有HSV处理（避免不必要的色彩空间转换和饱和度变化）
+        """
+        应用变暗老化
+
+        使用直接的线性变暗而不是HSV转换，以避免颜色偏移
+        """
+        # 如果darken_strength为0，跳过所有处理
         if darken_strength == 0.0:
             return image
 
         result = image.astype(np.float32)
 
-        if use_overlay:
-            # 组合模式：HSV + 棕色叠加
-            hsv = cv2.cvtColor(result / 255.0, cv2.COLOR_BGR2HSV)
-            hsv[:, :, 2] *= (1 - darken_strength * 0.4)
-            hsv[:, :, 1] *= 1.2
-            hsv = np.clip(hsv, 0, 1)
-            result = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR) * 255
-
-            # 棕色叠加
-            brown_color = np.array([15, 49, 80], dtype=np.float32)
-            brown_layer = np.ones_like(result) * brown_color
-            adjusted_opacity = overlay_opacity * 0.85
-            result = result * (1 - adjusted_opacity) + brown_layer * adjusted_opacity
-        else:
-            # 纯HSV方法
-            hsv = cv2.cvtColor(result / 255.0, cv2.COLOR_BGR2HSV)
-            hsv[:, :, 2] *= (1 - darken_strength)
-            hsv[:, :, 1] *= 1.4
-            hsv = np.clip(hsv, 0, 1)
-            result = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR) * 255
+        # 直接线性变暗（所有通道同比例降低，保持颜色不变）
+        # 这比HSV转换更精确，不会引入颜色偏移
+        result = result * (1 - darken_strength)
 
         return np.clip(result, 0, 255)
 

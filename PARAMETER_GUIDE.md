@@ -233,27 +233,65 @@ decay_range: [0.6, 0.8]   # 较强衰减
 
 ## 已修复的Bug
 
-### Bug: 即使darken_strength=0也会有颜色偏移（已修复）
+### Bug #1: HSV转换导致的颜色偏移（已修复）🔥
 
-**症状**：即使设置了 `darken_strength=0.0` 和 `opacity=0`，图片仍然出现红色偏移。
+**症状**：即使 `darken_strength` 设置为很小的值（如0.1），图片仍然出现明显的红色偏移。
 
 **根本原因**：
-- `_apply_darkening()` 函数中，即使 `darken_strength=0.0`，仍然会执行HSV色彩空间转换
-- 在HSV处理中，饱和度会被强制提升40%（`hsv[:, :, 1] *= 1.4`）
-- 多次色彩空间转换（RGB→BGR→HSV→BGR→RGB）会累积误差和颜色偏移
+- `_apply_darkening()` 使用HSV色彩空间转换来实现变暗效果
+- BGR ↔ HSV 转换涉及三角函数和非线性计算，会累积浮点误差
+- HSV色彩空间的圆柱形结构导致转换不完全可逆
+- 红色位于HSV色调环的0°/360°边界，对舍入误差特别敏感
+- 即使只修改V通道（亮度），转换回BGR时也可能影响颜色
 
-**修复方案**（已应用）：
+**旧的实现**（有颜色偏移）：
+```python
+# BGR → HSV → 修改V通道 → HSV → BGR
+hsv = cv2.cvtColor(result / 255.0, cv2.COLOR_BGR2HSV)
+hsv[:, :, 2] *= (1 - darken_strength)  # 降低亮度
+hsv[:, :, 1] *= 1.4  # 提升饱和度（加剧颜色偏移）
+result = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR) * 255
+```
+
+**新的实现**（无颜色偏移）：
+```python
+# 直接线性变暗，所有通道同比例降低
+result = image * (1 - darken_strength)
+```
+
+**技术优势**：
+- ✅ 无色彩空间转换 → 无转换误差
+- ✅ 线性操作 → 可预测，可逆
+- ✅ 所有通道同比例 → 保持颜色不变
+- ✅ 性能更好 → 避免昂贵的三角函数运算
+
+**影响**：
+- 修复后，任何 `darken_strength` 值都不会产生颜色偏移
+- 只降低亮度，完全保持原始颜色的色调和饱和度
+- `test_pure_brown_overlay.py` 和所有测试脚本现在都能正确工作
+
+### Bug #2: Early return位置错误（已修复）
+
+**症状**：即使设置了 `darken_strength=0.0`，仍然有轻微的类型转换误差。
+
+**根本原因**：
+- Early return 检查在类型转换**之后**
+- 即使跳过处理，仍然执行了 `uint8 → float32 → clip → uint8`
+
+**修复方案**：
 ```python
 def _apply_darkening(self, ...):
-    # 如果darken_strength为0，跳过所有HSV处理
+    # 先检查，完全跳过所有操作
     if darken_strength == 0.0:
-        return np.clip(result, 0, 255)
-    # 其余处理...
+        return image  # 直接返回，无任何转换
+
+    result = image.astype(np.float32)  # 只有需要时才转换
+    ...
 ```
 
 **影响**：
-- 修复后，`darken_strength=0.0` 时不再有任何颜色偏移
-- `test_pure_brown_overlay.py` 配置 `opacity=0` 时，输出应该与原图完全一致
+- `darken_strength=0.0` 时零开销，完全绕过函数
+- 同样应用于 `_apply_color_decay()` 和 `_apply_brown_overlay_only()`
 
 ## 快速参考
 
