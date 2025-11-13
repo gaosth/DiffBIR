@@ -15,7 +15,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 from diffbir.dataset.fading_restoration import FadingRestorationDataset
 
 
-def test_dataset(image_dir, prompt_csv, num_samples=5):
+def test_dataset(image_dir, prompt_csv, num_samples=5, use_brown_overlay=False,
+                random_fading=True):
     """
     测试数据集加载
 
@@ -23,10 +24,37 @@ def test_dataset(image_dir, prompt_csv, num_samples=5):
         image_dir: 图片目录
         prompt_csv: CSV文件路径
         num_samples: 要测试的样本数量
+        use_brown_overlay: 是否使用棕色叠加效果
+        random_fading: 是否随机化褪色参数
     """
     print("=" * 80)
     print("测试褪色修复数据集")
     print("=" * 80)
+
+    # 自定义褪色参数
+    fading_params = {
+        'saturation': 0.6,
+        'brightness': 1.4,
+        'yellow': 0.6,
+        'sepia': 0.4,
+        'crack_density': 0.3,
+        'crack_thickness': 1,
+        'crack_type': 'light',
+        'decay_range': (0.5, 0.7),
+        'noise_level': 10,
+        'num_stains': 5,
+        'aging_type': 'both',
+        'darken_strength': 0.3,
+        'use_brown_overlay': use_brown_overlay,  # 使用命令行参数
+        'overlay_opacity': 0.65
+    }
+
+    print(f"\n褪色效果配置:")
+    print(f"  使用棕色叠加: {use_brown_overlay}")
+    print(f"  随机化参数: {random_fading}")
+    print(f"  变暗强度: {fading_params['darken_strength']}")
+    if use_brown_overlay:
+        print(f"  叠加不透明度: {fading_params['overlay_opacity']}")
 
     # 创建数据集
     try:
@@ -35,7 +63,8 @@ def test_dataset(image_dir, prompt_csv, num_samples=5):
             prompt_csv=prompt_csv,
             out_size=512,
             crop_type="center",
-            random_fading=True
+            random_fading=random_fading,
+            fading_params=fading_params
         )
         print(f"\n✓ 数据集创建成功")
         print(f"  数据集大小: {len(dataset)}")
@@ -93,8 +122,10 @@ def test_dataset(image_dir, prompt_csv, num_samples=5):
         plt.suptitle(f"Prompt: {prompt}", fontsize=10, y=0.98)
         plt.tight_layout()
 
-        # 保存图片
-        output_path = "test_fading_sample.png"
+        # 保存图片（文件名包含配置信息）
+        overlay_str = "brown_overlay" if use_brown_overlay else "no_overlay"
+        random_str = "random" if random_fading else "fixed"
+        output_path = f"test_fading_{overlay_str}_{random_str}.png"
         plt.savefig(output_path, dpi=150, bbox_inches='tight')
         print(f"✓ 可视化结果保存到: {output_path}")
         plt.close()
@@ -118,6 +149,10 @@ if __name__ == "__main__":
     parser.add_argument("--image_dir", type=str, required=True, help="图片目录路径")
     parser.add_argument("--prompt_csv", type=str, required=True, help="CSV文件路径")
     parser.add_argument("--num_samples", type=int, default=5, help="测试样本数量")
+    parser.add_argument("--use_brown_overlay", action="store_true",
+                       help="使用棕色叠加效果（#50310f）来产生老化感")
+    parser.add_argument("--no_random", action="store_true",
+                       help="禁用随机化褪色参数（使用固定参数）")
 
     args = parser.parse_args()
 
@@ -131,6 +166,12 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # 运行测试
-    success = test_dataset(args.image_dir, args.prompt_csv, args.num_samples)
+    success = test_dataset(
+        args.image_dir,
+        args.prompt_csv,
+        args.num_samples,
+        use_brown_overlay=args.use_brown_overlay,
+        random_fading=not args.no_random
+    )
 
     sys.exit(0 if success else 1)
