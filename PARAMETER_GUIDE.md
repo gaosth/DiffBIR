@@ -231,6 +231,30 @@ decay_range: [0.6, 0.8]   # 较强衰减
 - 棕色叠加：由 overlay_opacity 控制（aging_type='darken'时）
 ```
 
+## 已修复的Bug
+
+### Bug: 即使darken_strength=0也会有颜色偏移（已修复）
+
+**症状**：即使设置了 `darken_strength=0.0` 和 `opacity=0`，图片仍然出现红色偏移。
+
+**根本原因**：
+- `_apply_darkening()` 函数中，即使 `darken_strength=0.0`，仍然会执行HSV色彩空间转换
+- 在HSV处理中，饱和度会被强制提升40%（`hsv[:, :, 1] *= 1.4`）
+- 多次色彩空间转换（RGB→BGR→HSV→BGR→RGB）会累积误差和颜色偏移
+
+**修复方案**（已应用）：
+```python
+def _apply_darkening(self, ...):
+    # 如果darken_strength为0，跳过所有HSV处理
+    if darken_strength == 0.0:
+        return np.clip(result, 0, 255)
+    # 其余处理...
+```
+
+**影响**：
+- 修复后，`darken_strength=0.0` 时不再有任何颜色偏移
+- `test_pure_brown_overlay.py` 配置 `opacity=0` 时，输出应该与原图完全一致
+
 ## 快速参考
 
 想要什么效果？

@@ -343,6 +343,10 @@ class FadingRestorationDataset(data.Dataset):
         """应用变暗老化"""
         result = image.astype(np.float32)
 
+        # 如果darken_strength为0，跳过所有HSV处理（避免不必要的色彩空间转换和饱和度变化）
+        if darken_strength == 0.0:
+            return np.clip(result, 0, 255)
+
         if use_overlay:
             # 组合模式：HSV + 棕色叠加
             hsv = cv2.cvtColor(result / 255.0, cv2.COLOR_BGR2HSV)
