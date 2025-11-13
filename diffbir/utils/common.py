@@ -285,20 +285,51 @@ def log_txt_as_img(wh, xc):
     # xc a list of captions to plot
     b = len(xc)
     txts = list()
+
+    # 尝试加载支持中文的字体
+    font = None
+    font_size = int(wh[0] / 32)  # 动态字体大小
+
+    # 按优先级尝试常见的中文字体路径
+    chinese_font_paths = [
+        # Linux常见中文字体
+        "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",  # 文泉驿正黑
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",  # 文泉驿微米黑
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/arphic/uming.ttc",
+        # Windows中文字体
+        "C:/Windows/Fonts/simhei.ttf",
+        "C:/Windows/Fonts/msyh.ttc",
+        # macOS中文字体
+        "/System/Library/Fonts/PingFang.ttc",
+        "/Library/Fonts/Arial Unicode.ttf",
+    ]
+
+    for font_path in chinese_font_paths:
+        try:
+            font = ImageFont.truetype(font_path, size=font_size)
+            break
+        except (OSError, IOError):
+            continue
+
+    # 如果没找到中文字体，使用默认字体（可能乱码）
+    if font is None:
+        font = ImageFont.load_default()
+        print("Warning: No Chinese font found. Chinese characters may not display correctly in TensorBoard.")
+
     for bi in range(b):
         txt = Image.new("RGB", wh, color="white")
         draw = ImageDraw.Draw(txt)
-        # font = ImageFont.truetype('font/DejaVuSans.ttf', size=size)
-        font = ImageFont.load_default()
         nc = int(40 * (wh[0] / 256))
         lines = "\n".join(
             xc[bi][start : start + nc] for start in range(0, len(xc[bi]), nc)
         )
 
         try:
-            draw.text((0, 0), lines, fill="black", font=font)
+            draw.text((10, 10), lines, fill="black", font=font)  # 添加边距
         except UnicodeEncodeError:
-            print("Cant encode string for logging. Skipping.")
+            print("Can't encode string for logging. Skipping.")
 
         txt = np.array(txt).transpose(2, 0, 1) / 127.5 - 1.0
         txts.append(txt)
