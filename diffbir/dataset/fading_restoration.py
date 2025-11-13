@@ -214,9 +214,12 @@ class FadingRestorationDataset(data.Dataset):
         user_decay_min, user_decay_max = self.fading_params['decay_range']
         if user_decay_min >= 0.85:  # 用户希望保持高亮度
             decay_range = self.fading_params['decay_range']
+            # 同时使用较小的 darken_strength 以保持亮度
+            darken_strength = self.fading_params['darken_strength']
         else:
-            # 否则使用随机范围，但以用户设置为中心
+            # 否则使用随机范围
             decay_range = (np.random.uniform(0.4, 0.6), np.random.uniform(0.6, 0.8))
+            darken_strength = np.random.uniform(0.2, 0.4)
 
         return {
             'saturation': np.random.uniform(0.5, 0.7),
@@ -226,11 +229,11 @@ class FadingRestorationDataset(data.Dataset):
             'crack_density': np.random.uniform(0.2, 0.4),
             'crack_thickness': self.fading_params['crack_thickness'],
             'crack_type': self.fading_params['crack_type'],
-            'decay_range': decay_range,  # 使用上面计算的值
+            'decay_range': decay_range,
             'noise_level': int(np.random.uniform(5, 15)),
             'num_stains': int(np.random.uniform(3, 8)),
             'aging_type': self.fading_params['aging_type'],
-            'darken_strength': np.random.uniform(0.2, 0.4),
+            'darken_strength': darken_strength,  # 使用上面计算的值
             'use_brown_overlay': self.fading_params['use_brown_overlay'],
             'overlay_opacity': self.fading_params['overlay_opacity']
         }
