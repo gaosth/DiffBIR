@@ -27,6 +27,33 @@ from diffbir.utils.common import instantiate_from_config, to, log_txt_as_img
 from diffbir.sampler import SpacedSampler
 
 
+def convert_chinese_to_pinyin(text_list):
+    """
+    将中文文本转换为拼音，如果没有安装pypinyin则返回ASCII版本
+
+    Args:
+        text_list: 字符串列表
+
+    Returns:
+        转换后的字符串列表
+    """
+    try:
+        from pypinyin import lazy_pinyin
+        converted = []
+        for text in text_list:
+            # 转换为拼音，用空格分隔
+            pinyin_list = lazy_pinyin(text)
+            converted.append(' '.join(pinyin_list))
+        return converted
+    except ImportError:
+        # 如果没有pypinyin，只保留ASCII字符
+        converted = []
+        for text in text_list:
+            ascii_text = ''.join(char if ord(char) < 128 else '?' for char in text)
+            converted.append(ascii_text)
+        return converted
+
+
 def main(args) -> None:
     # Setup accelerator:
     accelerator = Accelerator(split_batches=True)
@@ -197,6 +224,8 @@ def main(args) -> None:
                 log_cond_aug = {k: v[:N] for k, v in cond_aug.items()}
                 log_gt, log_lq = gt[:N], lq[:N]
                 log_prompt = prompt[:N]
+                # 将中文prompt转换为拼音以便在TensorBoard中显示
+                log_prompt_converted = convert_chinese_to_pinyin(log_prompt)
                 cldm.eval()
                 with torch.no_grad():
                     z = sampler.sample(
@@ -224,7 +253,7 @@ def main(args) -> None:
                             ),
                             (
                                 "image/prompt",
-                                (log_txt_as_img((512, 512), log_prompt) + 1) / 2,
+                                (log_txt_as_img((512, 512), log_prompt_converted) + 1) / 2,
                             ),
                         ]:
                             writer.add_image(tag, make_grid(image, nrow=4), global_step)
