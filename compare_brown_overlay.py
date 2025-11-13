@@ -28,17 +28,17 @@ def compare_brown_overlay_effect(image_dir, prompt_csv):
 
     # 固定的褪色参数（用于公平对比）
     base_params = {
-        'saturation': 0.6,
-        'brightness': 1.4,
-        'yellow': 0.6,
-        'sepia': 0.4,
+        'saturation': 0.6,     # aging_type='darken'时不使用
+        'brightness': 1.4,     # aging_type='darken'时不使用
+        'yellow': 0.6,         # aging_type='darken'时不使用
+        'sepia': 0.4,          # aging_type='darken'时不使用
         'crack_density': 0.0,  # 禁用裂纹以便更清楚地看到颜色变化
         'crack_thickness': 1,
         'crack_type': 'light',
         'decay_range': (0.5, 0.7),
         'noise_level': 5,      # 降低噪声以便更清楚地看到颜色
         'num_stains': 0,       # 禁用污渍
-        'aging_type': 'both',
+        'aging_type': 'darken',  # 只应用棕色叠加，不应用褪色效果
         'darken_strength': 0.3,
         'overlay_opacity': 0.65
     }

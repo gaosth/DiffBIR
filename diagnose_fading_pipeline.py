@@ -25,17 +25,17 @@ def diagnose_fading_pipeline(image_dir, prompt_csv):
 
     # 创建数据集
     fading_params = {
-        'saturation': 0.6,
-        'brightness': 1.4,
-        'yellow': 0.6,
-        'sepia': 0.4,
+        'saturation': 0.6,     # aging_type='darken'时不使用
+        'brightness': 1.4,     # aging_type='darken'时不使用
+        'yellow': 0.6,         # aging_type='darken'时不使用
+        'sepia': 0.4,          # aging_type='darken'时不使用
         'crack_density': 0.0,
         'crack_thickness': 1,
         'crack_type': 'light',
         'decay_range': (0.5, 0.7),
-        'noise_level': 0,  # 禁用噪声
-        'num_stains': 0,    # 禁用污渍
-        'aging_type': 'both',
+        'noise_level': 0,      # 禁用噪声
+        'num_stains': 0,       # 禁用污渍
+        'aging_type': 'darken',  # 只应用棕色叠加，不应用褪色效果
         'darken_strength': 0.3,
         'use_brown_overlay': True,
         'overlay_opacity': 0.65
@@ -61,7 +61,7 @@ def diagnose_fading_pipeline(image_dir, prompt_csv):
     steps = []
     steps.append(("0. 原始图片", img_bgr.copy()))
 
-    # 步骤1: 褪色
+    # 步骤1: 褪色 (如果aging_type='darken'则跳过)
     result = img_bgr.copy()
     if fading_params['aging_type'] in ['fade', 'both']:
         result = dataset._apply_fading(
@@ -71,21 +71,31 @@ def diagnose_fading_pipeline(image_dir, prompt_csv):
             yellow=fading_params['yellow'],
             sepia=fading_params['sepia']
         )
-    steps.append(("1. 应用褪色 (HSV调整)", result.copy()))
+        steps.append(("1. 应用褪色 (已跳过)", result.copy()))
+    else:
+        steps.append(("1. 应用褪色 (已跳过-aging_type='darken')", result.copy()))
 
-    # 步骤2: 变暗老化 (包括棕色叠加)
+    # 步骤2: HSV变暗 (不含棕色叠加)
     if fading_params['aging_type'] in ['darken', 'both']:
         result = dataset._apply_darkening(
             result,
             darken_strength=fading_params['darken_strength'],
-            use_overlay=fading_params['use_brown_overlay'],
+            use_overlay=False,  # 不包含棕色叠加
             overlay_opacity=fading_params['overlay_opacity']
         )
-    steps.append(("2. 应用棕色叠加 (#50310f)", result.copy()))
+    steps.append(("2. 应用HSV变暗", result.copy()))
 
-    # 步骤3: 色彩衰减 (这一步会削弱棕色效果！)
+    # 步骤3: 色彩衰减
     result = dataset._apply_color_decay(result, fading_params['decay_range'])
-    steps.append(("3. 应用色彩衰减 (削弱效果！)", result.copy()))
+    steps.append(("3. 应用色彩衰减", result.copy()))
+
+    # 步骤4: 棕色叠加 (在色彩衰减之后)
+    if fading_params['aging_type'] in ['darken', 'both'] and fading_params['use_brown_overlay']:
+        result = dataset._apply_brown_overlay_only(
+            result,
+            overlay_opacity=fading_params['overlay_opacity']
+        )
+    steps.append(("4. 应用棕色叠加 (#50310f)", result.copy()))
 
     # 创建对比图
     n_steps = len(steps)
@@ -119,7 +129,7 @@ def diagnose_fading_pipeline(image_dir, prompt_csv):
         axes[idx].axis('off')
 
     plt.suptitle("褪色效果Pipeline各阶段对比\n"
-                "关键问题：步骤3的色彩衰减会削弱步骤2的棕色叠加效果",
+                "使用aging_type='darken'：跳过褪色，只应用棕色叠加",
                 fontsize=14, fontweight='bold')
     plt.tight_layout()
 
@@ -145,24 +155,25 @@ def diagnose_fading_pipeline(image_dir, prompt_csv):
         brown_index = img_norm[:,:,2].mean() - img_norm[:,:,0].mean()
         print(f"  棕色指数 (B-R): {brown_index:.3f}")
 
-        if idx == 2:
+        if idx == 3:
+            print("  ↑ 色彩衰减后")
+        elif idx == 4:
             print("  ↑ 棕色叠加后，棕色指数应该明显提高")
-        elif idx == 3:
-            print("  ↑ 色彩衰减后，棕色指数被削弱")
 
     print("\n" + "=" * 80)
-    print("问题诊断")
+    print("当前配置")
     print("=" * 80)
-    print("\n原因：")
-    print("  步骤2添加了棕色叠加 (#50310f，RGB约为[80,49,15])")
-    print("  步骤3的色彩衰减会对所有通道乘以0.5-0.7的系数")
-    print("  这会削弱刚刚添加的棕色调！")
+    print("\naging_type='darken' 模式：")
+    print("  ✓ 跳过褪色效果（saturation/brightness/yellow/sepia）")
+    print("  ✓ 应用HSV变暗")
+    print("  ✓ 应用色彩衰减")
+    print("  ✓ 最后应用棕色叠加 (#50310f，RGB约为[80,49,15])")
+    print("  ✓ 这样棕色叠加效果不会被削弱！")
 
-    print("\n建议的解决方案：")
-    print("  1. 调整顺序：在色彩衰减之后再应用棕色叠加")
-    print("  2. 或者：在测试时禁用色彩衰减")
-    print("  3. 或者：增加棕色叠加的不透明度 (overlay_opacity > 0.8)")
-    print("  4. 或者：减少色彩衰减的强度 (decay_range = (0.7, 0.9))")
+    print("\naging_type选项说明：")
+    print("  'fade' - 只应用褪色效果")
+    print("  'darken' - 只应用变暗+棕色叠加（推荐）")
+    print("  'both' - 同时应用褪色和变暗")
 
 
 if __name__ == "__main__":

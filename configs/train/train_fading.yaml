@@ -94,19 +94,25 @@ dataset:
       random_fading: true
       # 褪色参数（如果random_fading=true，这些值会作为参考范围）
       fading_params:
-        saturation: 0.6
-        brightness: 1.4
-        yellow: 0.6
-        sepia: 0.4
+        # 以下参数仅在aging_type='fade'或'both'时生效
+        saturation: 0.6        # 饱和度降低（aging_type='darken'时不使用）
+        brightness: 1.4        # 亮度提升（aging_type='darken'时不使用）
+        yellow: 0.6            # 黄色调（aging_type='darken'时不使用）
+        sepia: 0.4             # 棕褐色调（aging_type='darken'时不使用）
+        # 以下参数始终生效
         crack_density: 0.3
         crack_thickness: 1
         crack_type: 'light'
         decay_range: [0.5, 0.7]
         noise_level: 10
         num_stains: 5
-        aging_type: 'both'
+        # aging_type选项：
+        #   'fade' - 只应用褪色效果（saturation/brightness/yellow/sepia）
+        #   'darken' - 只应用变暗+棕色叠加（跳过褪色效果）
+        #   'both' - 同时应用褪色和变暗
+        aging_type: 'darken'   # 推荐：只用棕色叠加，不用褪色效果
         darken_strength: 0.3
-        use_brown_overlay: false
+        use_brown_overlay: true  # 启用棕色叠加
         overlay_opacity: 0.65
 
 batch_transform:

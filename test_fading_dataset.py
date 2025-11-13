@@ -33,17 +33,17 @@ def test_dataset(image_dir, prompt_csv, num_samples=5, use_brown_overlay=False,
 
     # 自定义褪色参数
     fading_params = {
-        'saturation': 0.6,
-        'brightness': 1.4,
-        'yellow': 0.6,
-        'sepia': 0.4,
+        'saturation': 0.6,        # aging_type='darken'时不使用
+        'brightness': 1.4,        # aging_type='darken'时不使用
+        'yellow': 0.6,            # aging_type='darken'时不使用
+        'sepia': 0.4,             # aging_type='darken'时不使用
         'crack_density': 0.3,
         'crack_thickness': 1,
         'crack_type': 'light',
         'decay_range': (0.5, 0.7),
         'noise_level': 10,
         'num_stains': 5,
-        'aging_type': 'both',
+        'aging_type': 'darken',   # 改为'darken'：只应用变暗+棕色叠加，不应用褪色效果
         'darken_strength': 0.3,
         'use_brown_overlay': use_brown_overlay,  # 使用命令行参数
         'overlay_opacity': 0.65
