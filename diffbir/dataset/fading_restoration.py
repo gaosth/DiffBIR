@@ -327,6 +327,10 @@ class FadingRestorationDataset(data.Dataset):
         Returns:
             应用棕色叠加后的图像
         """
+        # 如果opacity为0，完全跳过处理（避免任何类型转换）
+        if overlay_opacity == 0.0:
+            return image
+
         result = image.astype(np.float32)
 
         # 棕色叠加 (#50310f -> BGR: [15, 49, 80])
@@ -341,11 +345,11 @@ class FadingRestorationDataset(data.Dataset):
     def _apply_darkening(self, image: np.ndarray, darken_strength: float,
                         use_overlay: bool, overlay_opacity: float) -> np.ndarray:
         """应用变暗老化"""
-        result = image.astype(np.float32)
-
         # 如果darken_strength为0，跳过所有HSV处理（避免不必要的色彩空间转换和饱和度变化）
         if darken_strength == 0.0:
-            return np.clip(result, 0, 255)
+            return image
+
+        result = image.astype(np.float32)
 
         if use_overlay:
             # 组合模式：HSV + 棕色叠加
@@ -372,6 +376,10 @@ class FadingRestorationDataset(data.Dataset):
 
     def _apply_color_decay(self, image: np.ndarray, decay_range: Tuple[float, float]) -> np.ndarray:
         """应用非均匀色彩衰减"""
+        # 如果decay_range是(1.0, 1.0)，完全跳过处理（不衰减，避免任何copy和类型转换）
+        if decay_range[0] == 1.0 and decay_range[1] == 1.0:
+            return image
+
         h, w = image.shape[:2]
         result = image.copy().astype(np.float32)
 
