@@ -105,9 +105,11 @@ dataset:
         crack_type: 'light'
         # decay_range: 色彩衰减范围 [min, max]
         #   [0.5, 0.7] - 强衰减，图片会明显变暗
-        #   [0.8, 0.95] - 中度衰减（推荐）
+        #   [0.8, 0.95] - 中度衰减
+        #   [0.85, 0.95] - 中度衰减（推荐，会使用用户设置而非随机值）
         #   [0.95, 1.0] - 轻微衰减，几乎保持原样
-        decay_range: [0.8, 0.95]  # 中度衰减
+        #   注意：如果min < 0.85，代码会忽略此设置并使用更强的随机范围！
+        decay_range: [0.85, 0.95]  # 改成0.85以使用用户设置
         noise_level: 10
         num_stains: 5
         # aging_type选项：
@@ -115,7 +117,7 @@ dataset:
         #   'darken' - 只应用变暗+棕色叠加（跳过褪色效果）
         #   'both' - 同时应用褪色和变暗
         aging_type: 'darken'   # 推荐：只用棕色叠加，不用褪色效果
-        darken_strength: 0.3
+        darken_strength: 0.2   # 降低变暗强度
         use_brown_overlay: true  # 启用棕色叠加
         overlay_opacity: 0.65
 
