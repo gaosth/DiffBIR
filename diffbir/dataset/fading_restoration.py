@@ -199,7 +199,25 @@ class FadingRestorationDataset(data.Dataset):
         return degraded_rgb
 
     def _get_random_fading_params(self) -> dict:
-        """生成随机化的褪色参数"""
+        """
+        生成随机化的褪色参数
+
+        注意：以下参数会从fading_params中读取，不会随机化：
+        - aging_type
+        - use_brown_overlay
+        - overlay_opacity
+        - decay_range (新增：尊重用户设置)
+        - crack_thickness
+        - crack_type
+        """
+        # 如果用户设置了接近1.0的decay_range，说明不想要衰减，保持用户设置
+        user_decay_min, user_decay_max = self.fading_params['decay_range']
+        if user_decay_min >= 0.85:  # 用户希望保持高亮度
+            decay_range = self.fading_params['decay_range']
+        else:
+            # 否则使用随机范围，但以用户设置为中心
+            decay_range = (np.random.uniform(0.4, 0.6), np.random.uniform(0.6, 0.8))
+
         return {
             'saturation': np.random.uniform(0.5, 0.7),
             'brightness': np.random.uniform(1.2, 1.6),
@@ -208,7 +226,7 @@ class FadingRestorationDataset(data.Dataset):
             'crack_density': np.random.uniform(0.2, 0.4),
             'crack_thickness': self.fading_params['crack_thickness'],
             'crack_type': self.fading_params['crack_type'],
-            'decay_range': (np.random.uniform(0.4, 0.6), np.random.uniform(0.6, 0.8)),
+            'decay_range': decay_range,  # 使用上面计算的值
             'noise_level': int(np.random.uniform(5, 15)),
             'num_stains': int(np.random.uniform(3, 8)),
             'aging_type': self.fading_params['aging_type'],
