@@ -4,8 +4,9 @@
 
 与原始inference.py的主要区别：
 1. 不使用SwinIR（Stage1），直接用褪色图片作为ControlNet条件
-2. 支持从CSV文件加载prompt，或使用默认prompt
-3. 简化的流程，专门针对褪色修复任务
+2. 支持从CSV文件加载prompt，或使用默认prompt，或自动生成prompt
+3. 支持对原始图片自动应用褪色效果（用于测试）
+4. 简化的流程，专门针对褪色修复任务
 """
 
 import os
@@ -67,6 +68,70 @@ def load_prompts_from_csv(csv_path: str) -> dict:
     return prompts
 
 
+def apply_fading_effect(image: np.ndarray, fading_params: dict) -> np.ndarray:
+    """
+    对原始图片应用褪色效果
+
+    Args:
+        image: RGB图像，范围[0, 1]，float32
+        fading_params: 褪色参数字典
+
+    Returns:
+        褪色后的图像，范围[0, 1]，float32
+    """
+    import cv2
+    from diffbir.dataset.fading_restoration import FadingRestorationDataset
+
+    # 创建一个临时dataset对象以使用其褪色方法
+    class TempDataset:
+        def __init__(self, params):
+            self.fading_params = params
+            self.random_fading = False  # 不使用随机化
+
+    temp_dataset = TempDataset(fading_params)
+
+    # 将图像转换为uint8 BGR格式（OpenCV格式）
+    image_uint8 = (image * 255).astype(np.uint8)
+    image_bgr = cv2.cvtColor(image_uint8, cv2.COLOR_RGB2BGR)
+
+    # 应用褪色效果
+    from diffbir.dataset.fading_restoration import FadingRestorationDataset
+    dataset_temp = FadingRestorationDataset(
+        image_dir=".",  # dummy
+        prompt_csv=".",  # dummy
+        fading_params=fading_params,
+        random_fading=False
+    )
+
+    # 使用dataset的褪色方法
+    degraded_bgr = dataset_temp._synthesize_degradation(image_bgr.astype(np.float32), fading_params)
+
+    # 转换回RGB，范围[0, 1]
+    degraded_rgb = cv2.cvtColor(degraded_bgr.astype(np.uint8), cv2.COLOR_BGR2RGB)
+    degraded_float = degraded_rgb.astype(np.float32) / 255.0
+
+    return degraded_float
+
+
+def auto_generate_prompt(image: np.ndarray, captioner_type: str = "simple") -> str:
+    """
+    自动生成图片描述prompt
+
+    Args:
+        image: RGB图像，范围[0, 1]
+        captioner_type: captioner类型 ("simple" 或其他)
+
+    Returns:
+        生成的prompt
+    """
+    if captioner_type == "simple":
+        # 简单的默认prompt
+        return "Ancient Chinese painting, traditional artwork, historical image"
+    else:
+        # TODO: 如果需要，可以集成LLAVA或其他captioner
+        return "Ancient Chinese painting, traditional artwork, historical image"
+
+
 def main():
     parser = ArgumentParser()
 
@@ -80,12 +145,25 @@ def main():
     parser.add_argument("--config", type=str, required=True,
                         help="训练配置文件路径（train_fading.yaml）")
 
-    # 可选参数
+    # Prompt相关参数
     parser.add_argument("--prompt_csv", type=str, default=None,
                         help="包含prompts的CSV文件路径（可选）")
     parser.add_argument("--default_prompt", type=str,
                         default="Ancient Chinese painting, faded colors, historical artwork",
                         help="默认prompt（当没有CSV或CSV中找不到对应图片时使用）")
+    parser.add_argument("--auto_prompt", action="store_true",
+                        help="自动生成prompt（如果启用，会为每张图片生成简单的默认prompt）")
+
+    # 褪色效果相关参数
+    parser.add_argument("--apply_fading", action="store_true",
+                        help="对输入图片应用褪色效果（如果你的输入是原始图片而非褪色图片）")
+    parser.add_argument("--fading_strength", type=str, default="medium",
+                        choices=["light", "medium", "strong"],
+                        help="褪色强度（仅在--apply_fading时有效）")
+    parser.add_argument("--save_faded", action="store_true",
+                        help="保存褪色后的中间图片（用于对比）")
+
+    # 采样参数
     parser.add_argument("--steps", type=int, default=50,
                         help="扩散采样步数（更多步数=更好质量，但更慢）")
     parser.add_argument("--cfg_scale", type=float, default=1.0,
@@ -154,6 +232,68 @@ def main():
 
     print("Models loaded successfully!")
 
+    # 准备褪色参数（如果需要应用褪色效果）
+    fading_params = None
+    if args.apply_fading:
+        # 根据褪色强度选择参数
+        if args.fading_strength == "light":
+            fading_params = {
+                'aging_type': 'darken',
+                'decay_range': (0.9, 0.95),
+                'darken_strength': 0.1,
+                'use_brown_overlay': True,
+                'overlay_opacity': 0.4,
+                'noise_level': 0,
+                'num_stains': 0,
+                'crack_density': 0.0,
+                'crack_thickness': 1,
+                'crack_type': 'light',
+                'saturation': 1.0,
+                'brightness': 1.0,
+                'yellow': 0.0,
+                'sepia': 0.0,
+            }
+        elif args.fading_strength == "medium":
+            fading_params = {
+                'aging_type': 'darken',
+                'decay_range': (0.85, 0.95),
+                'darken_strength': 0.2,
+                'use_brown_overlay': True,
+                'overlay_opacity': 0.65,
+                'noise_level': 5,
+                'num_stains': 0,
+                'crack_density': 0.0,
+                'crack_thickness': 1,
+                'crack_type': 'light',
+                'saturation': 1.0,
+                'brightness': 1.0,
+                'yellow': 0.0,
+                'sepia': 0.0,
+            }
+        else:  # strong
+            fading_params = {
+                'aging_type': 'darken',
+                'decay_range': (0.7, 0.85),
+                'darken_strength': 0.3,
+                'use_brown_overlay': True,
+                'overlay_opacity': 0.8,
+                'noise_level': 10,
+                'num_stains': 3,
+                'crack_density': 0.0,
+                'crack_thickness': 1,
+                'crack_type': 'light',
+                'saturation': 1.0,
+                'brightness': 1.0,
+                'yellow': 0.0,
+                'sepia': 0.0,
+            }
+        print(f"  Will apply {args.fading_strength} fading effect to input images")
+
+    # 如果需要保存褪色图片，创建子目录
+    if args.save_faded:
+        faded_output_dir = os.path.join(args.output, "faded_images")
+        os.makedirs(faded_output_dir, exist_ok=True)
+
     # 获取输入图片列表
     input_path = Path(args.input)
     if input_path.is_file():
@@ -170,15 +310,30 @@ def main():
     for img_path in tqdm(image_files, desc="Processing images"):
         filename = img_path.name
 
+        # 加载原始图片
+        original_image = load_image(str(img_path), size=args.max_size)
+        h, w = original_image.shape[:2]
+
+        # 如果需要应用褪色效果
+        if args.apply_fading:
+            lq_image = apply_fading_effect(original_image, fading_params)
+
+            # 如果需要保存褪色图片
+            if args.save_faded:
+                faded_uint8 = (lq_image * 255).astype(np.uint8)
+                faded_path = os.path.join(faded_output_dir, img_path.stem + "_faded" + img_path.suffix)
+                Image.fromarray(faded_uint8).save(faded_path)
+        else:
+            # 输入已经是褪色图片
+            lq_image = original_image
+
         # 获取prompt
-        if filename in prompts_dict:
+        if args.auto_prompt:
+            prompt = auto_generate_prompt(lq_image, captioner_type="simple")
+        elif filename in prompts_dict:
             prompt = prompts_dict[filename]
         else:
             prompt = args.default_prompt
-
-        # 加载图片
-        lq_image = load_image(str(img_path), size=args.max_size)
-        h, w = lq_image.shape[:2]
 
         # 转换为tensor并添加batch维度
         lq_tensor = torch.from_numpy(lq_image).to(args.device)
@@ -216,6 +371,8 @@ def main():
             Image.fromarray(restored).save(output_path)
 
     print(f"\nDone! Results saved to {args.output}")
+    if args.save_faded:
+        print(f"Faded images saved to {faded_output_dir}")
 
 
 if __name__ == "__main__":
