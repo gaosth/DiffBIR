@@ -51,12 +51,21 @@ def load_image(image_path: str, size: int = None) -> np.ndarray:
                 new_w = int(w * size / h)
             image = image.resize((new_w, new_h), Image.LANCZOS)
 
-    # 确保尺寸是8的倍数（VAE要求）
+    # 确保尺寸是64的倍数（U-Net的下采样/上采样要求）
+    # 8的倍数对VAE够用，但U-Net有多层下采样，需要更大的倍数
+    # 64的倍数确保latent尺寸是8的倍数，避免奇数问题
     w, h = image.size
-    new_w = w - (w % 8)
-    new_h = h - (h % 8)
+    new_w = w - (w % 64) if w % 64 != 0 else w
+    new_h = h - (h % 64) if h % 64 != 0 else h
+
+    # 如果裁切后尺寸太小，改用resize
+    if new_w < 64:
+        new_w = 64
+    if new_h < 64:
+        new_h = 64
+
     if new_w != w or new_h != h:
-        # 裁切到8的倍数
+        # 裁切到64的倍数（从右下角裁掉多余部分）
         image = image.crop((0, 0, new_w, new_h))
 
     # 转换为numpy数组，范围[0, 1]
