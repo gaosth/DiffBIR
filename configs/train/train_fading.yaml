@@ -88,8 +88,12 @@ dataset:
       prompt_csv: /path/to/your/image_prompts.csv
       # 输出图片尺寸
       out_size: 512
-      # 裁剪类型：center, random, none
-      crop_type: center
+      # 裁剪类型：center, random, resize, none
+      #   center - 中心裁剪（保持长宽比，裁切中心512x512）
+      #   random - 随机裁剪（保持长宽比，随机位置裁切512x512，增加数据多样性）
+      #   resize - 直接resize到512x512（不保持长宽比，但使用完整图片内容）
+      #   none - 不裁剪（要求图片已经是512x512）
+      crop_type: resize
       # 是否随机化褪色参数以增加多样性
       random_fading: true
       # 褪色参数（如果random_fading=true，这些值会作为参考范围）

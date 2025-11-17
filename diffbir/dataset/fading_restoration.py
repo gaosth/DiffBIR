@@ -47,8 +47,8 @@ class FadingRestorationDataset(data.Dataset):
         self.crop_type = crop_type
         self.random_fading = random_fading
 
-        assert crop_type in ["none", "center", "random"], \
-            f"crop_type must be 'none', 'center' or 'random', got {crop_type}"
+        assert crop_type in ["none", "center", "random", "resize"], \
+            f"crop_type must be 'none', 'center', 'random' or 'resize', got {crop_type}"
 
         # 默认褪色参数
         if fading_params is None:
@@ -110,7 +110,7 @@ class FadingRestorationDataset(data.Dataset):
         return image_files
 
     def load_and_crop_image(self, filename: str) -> np.ndarray:
-        """加载并裁剪图片"""
+        """加载并裁剪/resize图片"""
         image_path = self.image_dir / filename
         image = Image.open(image_path).convert("RGB")
 
@@ -122,6 +122,8 @@ class FadingRestorationDataset(data.Dataset):
                     image = self._center_crop(image, self.out_size)
                 elif self.crop_type == "random":
                     image = self._random_crop(image, self.out_size)
+                elif self.crop_type == "resize":
+                    image = self._resize(image, self.out_size)
         else:
             assert image.height == self.out_size and image.width == self.out_size, \
                 f"Image size mismatch: expected {self.out_size}x{self.out_size}, got {image.height}x{image.width}"
@@ -169,6 +171,11 @@ class FadingRestorationDataset(data.Dataset):
         bottom = top + size
 
         image = image.crop((left, top, right, bottom))
+        return np.array(image)
+
+    def _resize(self, image: Image.Image, size: int) -> np.ndarray:
+        """直接resize到目标尺寸（可能改变长宽比）"""
+        image = image.resize((size, size), Image.LANCZOS)
         return np.array(image)
 
     def apply_fading_degradation(self, image: np.ndarray) -> np.ndarray:
