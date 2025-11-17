@@ -51,6 +51,14 @@ def load_image(image_path: str, size: int = None) -> np.ndarray:
                 new_w = int(w * size / h)
             image = image.resize((new_w, new_h), Image.LANCZOS)
 
+    # 确保尺寸是8的倍数（VAE要求）
+    w, h = image.size
+    new_w = w - (w % 8)
+    new_h = h - (h % 8)
+    if new_w != w or new_h != h:
+        # 裁切到8的倍数
+        image = image.crop((0, 0, new_w, new_h))
+
     # 转换为numpy数组，范围[0, 1]
     image = np.array(image).astype(np.float32) / 255.0
     return image
