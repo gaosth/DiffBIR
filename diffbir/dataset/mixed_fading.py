@@ -9,9 +9,8 @@
 """
 
 import numpy as np
-import torch
 from torch.utils.data import Dataset
-from typing import Dict, Optional
+from typing import Tuple, Optional
 
 from .fading_restoration import FadingRestorationDataset
 from .paired_fading import PairedFadingDataset
@@ -116,15 +115,14 @@ class MixedFadingDataset(Dataset):
     def __len__(self) -> int:
         return self._length
 
-    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
+    def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray, str]:
         """
         根据paired_ratio随机选择从哪个数据集采样
 
         Returns:
-            dict containing:
-                - gt: ground truth图片 [3, H, W], float32, range [0, 1]
-                - lq: 低质量图片（褪色） [3, H, W], float32, range [0, 1]
-                - prompt: 图片描述文本
+            gt: ground truth图片 [H, W, 3], float32, range [-1, 1]
+            lq: 低质量图片（褪色） [H, W, 3], float32, range [0, 1]
+            prompt: 图片描述文本
         """
         # 只有unpaired数据集
         if self.paired_dataset is None:
@@ -268,7 +266,7 @@ class BalancedMixedFadingDataset(Dataset):
     def __len__(self) -> int:
         return self._length
 
-    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
+    def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray, str]:
         """根据预生成的索引获取样本"""
         dataset_type, real_idx = self.indices[idx]
 
@@ -353,9 +351,9 @@ if __name__ == "__main__":
     # 统计采样比例
     paired_count = 0
     for i in range(len(dataset)):
-        sample = dataset[i]
+        gt, lq, prompt = dataset[i]
         # 可以通过prompt来区分
-        if 'Paired' in sample['prompt']:
+        if 'Paired' in prompt:
             paired_count += 1
 
     print(f"Actual paired ratio: {paired_count}/{len(dataset)} = {paired_count/len(dataset):.1%}")
@@ -383,8 +381,8 @@ if __name__ == "__main__":
     # 统计采样比例
     paired_count = 0
     for i in range(len(balanced_dataset)):
-        sample = balanced_dataset[i]
-        if 'Paired' in sample['prompt']:
+        gt, lq, prompt = balanced_dataset[i]
+        if 'Paired' in prompt:
             paired_count += 1
 
     print(f"Actual paired ratio: {paired_count}/{len(balanced_dataset)} = {paired_count/len(balanced_dataset):.1%}")

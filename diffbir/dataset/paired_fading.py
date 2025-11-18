@@ -9,11 +9,10 @@
 
 import os
 import csv
-from typing import Dict, Tuple, Optional, List
+from typing import Tuple, Optional, List
 from pathlib import Path
 
 import numpy as np
-import torch
 from PIL import Image
 from torch.utils.data import Dataset
 
@@ -231,15 +230,14 @@ class PairedFadingDataset(Dataset):
     def __len__(self) -> int:
         return len(self.image_files)
 
-    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
+    def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray, str]:
         """
         返回一个训练样本
 
         Returns:
-            dict containing:
-                - gt: ground truth修复图片 [3, H, W], float32, range [0, 1]
-                - lq: 褪色图片（作为condition） [3, H, W], float32, range [0, 1]
-                - prompt: 图片描述文本
+            gt: ground truth修复图片 [H, W, 3], float32, range [-1, 1]
+            lq: 褪色图片（作为condition） [H, W, 3], float32, range [0, 1]
+            prompt: 图片描述文本
         """
         stem = self.image_files[idx]
 
@@ -272,13 +270,12 @@ class PairedFadingDataset(Dataset):
         # 处理图片对
         ori_array, fixed_array = self._process_image_pair(ori_image, fixed_image)
 
-        # 转换为float32，范围[0, 1]
-        ori_float = ori_array.astype(np.float32) / 255.0
-        fixed_float = fixed_array.astype(np.float32) / 255.0
+        # 数据格式转换（与FadingRestorationDataset保持一致）
+        # GT: RGB, [0, 255] -> RGB, [-1, 1]
+        gt = (fixed_array.astype(np.float32) / 255.0 * 2 - 1).astype(np.float32)
 
-        # 转换为tensor [H, W, C] -> [C, H, W]
-        lq_tensor = torch.from_numpy(ori_float).permute(2, 0, 1)
-        gt_tensor = torch.from_numpy(fixed_float).permute(2, 0, 1)
+        # LQ: RGB, [0, 255] -> RGB, [0, 1]
+        lq = (ori_array.astype(np.float32) / 255.0).astype(np.float32)
 
         # 获取prompt
         if stem in self.prompts:
@@ -287,11 +284,7 @@ class PairedFadingDataset(Dataset):
             # 默认prompt
             prompt = "Ancient Chinese painting, traditional artwork, historical image"
 
-        return {
-            "gt": gt_tensor,
-            "lq": lq_tensor,
-            "prompt": prompt
-        }
+        return gt, lq, prompt
 
 
 if __name__ == "__main__":
@@ -335,25 +328,24 @@ if __name__ == "__main__":
     print(f"\nDataset length: {len(dataset)}")
 
     # 获取一个样本
-    sample = dataset[0]
-    print(f"\nSample keys: {sample.keys()}")
-    print(f"GT shape: {sample['gt'].shape}, dtype: {sample['gt'].dtype}")
-    print(f"LQ shape: {sample['lq'].shape}, dtype: {sample['lq'].dtype}")
-    print(f"GT range: [{sample['gt'].min():.3f}, {sample['gt'].max():.3f}]")
-    print(f"LQ range: [{sample['lq'].min():.3f}, {sample['lq'].max():.3f}]")
-    print(f"Prompt: {sample['prompt']}")
+    gt, lq, prompt = dataset[0]
+    print(f"\nGT shape: {gt.shape}, dtype: {gt.dtype}")
+    print(f"LQ shape: {lq.shape}, dtype: {lq.dtype}")
+    print(f"GT range: [{gt.min():.3f}, {gt.max():.3f}]")
+    print(f"LQ range: [{lq.min():.3f}, {lq.max():.3f}]")
+    print(f"Prompt: {prompt}")
 
     # 可视化
     fig, axes = plt.subplots(1, 2, figsize=(10, 5))
 
-    lq_np = sample['lq'].permute(1, 2, 0).numpy()
-    gt_np = sample['gt'].permute(1, 2, 0).numpy()
+    # GT需要从[-1, 1]转换回[0, 1]用于显示
+    gt_display = (gt + 1) / 2
 
-    axes[0].imshow(lq_np)
-    axes[0].set_title(f"LQ (Faded)\n{sample['prompt']}")
+    axes[0].imshow(lq)
+    axes[0].set_title(f"LQ (Faded)\n{prompt}")
     axes[0].axis('off')
 
-    axes[1].imshow(gt_np)
+    axes[1].imshow(gt_display)
     axes[1].set_title("GT (Restored)")
     axes[1].axis('off')
 
