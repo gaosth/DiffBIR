@@ -51,25 +51,28 @@ class FadingRestorationDataset(data.Dataset):
             f"crop_type must be 'none', 'center', 'random' or 'resize', got {crop_type}"
 
         # 默认褪色参数
+        default_fading_params = {
+            'saturation': 0.6,
+            'brightness': 1.4,
+            'yellow': 0.6,
+            'sepia': 0.4,
+            'crack_density': 0.3,
+            'crack_thickness': 1,
+            'crack_type': 'light',
+            'decay_range': (0.5, 0.7),
+            'noise_level': 10,
+            'num_stains': 5,
+            'aging_type': 'both',
+            'darken_strength': 0.3,
+            'use_brown_overlay': False,
+            'overlay_opacity': 0.65
+        }
+
         if fading_params is None:
-            self.fading_params = {
-                'saturation': 0.6,
-                'brightness': 1.4,
-                'yellow': 0.6,
-                'sepia': 0.4,
-                'crack_density': 0.3,
-                'crack_thickness': 1,
-                'crack_type': 'light',
-                'decay_range': (0.5, 0.7),
-                'noise_level': 10,
-                'num_stains': 5,
-                'aging_type': 'both',
-                'darken_strength': 0.3,
-                'use_brown_overlay': False,
-                'overlay_opacity': 0.65
-            }
+            self.fading_params = default_fading_params
         else:
-            self.fading_params = fading_params
+            # 合并用户参数和默认参数，用户参数优先
+            self.fading_params = {**default_fading_params, **fading_params}
 
         # 读取prompt CSV文件
         self.prompts = self._load_prompts(prompt_csv)
