@@ -26,16 +26,13 @@ class MixedFadingDataset(Dataset):
     def __init__(
         self,
         # Unpaired数据集参数
-        unpaired_image_folder: str = None,
+        unpaired_image_dir: str = None,
         unpaired_prompt_csv: str = None,
         unpaired_out_size: int = 512,
         unpaired_crop_type: str = "resize",
         # 褪色参数（用于unpaired）
-        aging_type: str = "random",
-        decay_range: tuple = (0.85, 0.95),
-        darken_strength: float = 0.2,
-        use_brown_overlay: bool = True,
-        overlay_opacity: float = 0.15,
+        fading_params: dict = None,
+        random_fading: bool = True,
         # Paired数据集参数
         paired_data_root: str = None,
         paired_prompt_csv: str = None,
@@ -51,6 +48,8 @@ class MixedFadingDataset(Dataset):
         Args:
             unpaired_*: FadingRestorationDataset的参数
             paired_*: PairedFadingDataset的参数
+            fading_params: 褪色参数字典，传递给FadingRestorationDataset
+            random_fading: 是否随机生成褪色参数
             paired_ratio: paired数据的采样比例，范围[0, 1]
                 - 0.0: 只使用unpaired数据
                 - 1.0: 只使用paired数据
@@ -63,17 +62,14 @@ class MixedFadingDataset(Dataset):
 
         # 初始化unpaired数据集
         self.unpaired_dataset = None
-        if unpaired_image_folder is not None and paired_ratio < 1.0:
+        if unpaired_image_dir is not None and paired_ratio < 1.0:
             self.unpaired_dataset = FadingRestorationDataset(
-                image_folder=unpaired_image_folder,
+                image_dir=unpaired_image_dir,
                 prompt_csv=unpaired_prompt_csv,
                 out_size=unpaired_out_size,
                 crop_type=unpaired_crop_type,
-                aging_type=aging_type,
-                decay_range=decay_range,
-                darken_strength=darken_strength,
-                use_brown_overlay=use_brown_overlay,
-                overlay_opacity=overlay_opacity,
+                fading_params=fading_params,
+                random_fading=random_fading,
             )
             print(f"Unpaired dataset: {len(self.unpaired_dataset)} images")
 
@@ -159,16 +155,13 @@ class BalancedMixedFadingDataset(Dataset):
     def __init__(
         self,
         # Unpaired数据集参数
-        unpaired_image_folder: str = None,
+        unpaired_image_dir: str = None,
         unpaired_prompt_csv: str = None,
         unpaired_out_size: int = 512,
         unpaired_crop_type: str = "resize",
         # 褪色参数（用于unpaired）
-        aging_type: str = "random",
-        decay_range: tuple = (0.85, 0.95),
-        darken_strength: float = 0.2,
-        use_brown_overlay: bool = True,
-        overlay_opacity: float = 0.15,
+        fading_params: dict = None,
+        random_fading: bool = True,
         # Paired数据集参数
         paired_data_root: str = None,
         paired_prompt_csv: str = None,
@@ -194,17 +187,14 @@ class BalancedMixedFadingDataset(Dataset):
 
         # 初始化unpaired数据集
         self.unpaired_dataset = None
-        if unpaired_image_folder is not None and self.num_unpaired > 0:
+        if unpaired_image_dir is not None and self.num_unpaired > 0:
             self.unpaired_dataset = FadingRestorationDataset(
-                image_folder=unpaired_image_folder,
+                image_dir=unpaired_image_dir,
                 prompt_csv=unpaired_prompt_csv,
                 out_size=unpaired_out_size,
                 crop_type=unpaired_crop_type,
-                aging_type=aging_type,
-                decay_range=decay_range,
-                darken_strength=darken_strength,
-                use_brown_overlay=use_brown_overlay,
-                overlay_opacity=overlay_opacity,
+                fading_params=fading_params,
+                random_fading=random_fading,
             )
             print(f"Unpaired dataset: {len(self.unpaired_dataset)} images")
 
@@ -223,7 +213,7 @@ class BalancedMixedFadingDataset(Dataset):
 
         # 验证
         if self.num_unpaired > 0 and self.unpaired_dataset is None:
-            raise ValueError("需要unpaired数据但未提供unpaired_image_folder")
+            raise ValueError("需要unpaired数据但未提供unpaired_image_dir")
         if self.num_paired > 0 and self.paired_dataset is None:
             raise ValueError("需要paired数据但未提供paired_data_root")
 
@@ -334,7 +324,7 @@ if __name__ == "__main__":
     print("=" * 50)
 
     dataset = MixedFadingDataset(
-        unpaired_image_folder=unpaired_dir,
+        unpaired_image_dir=unpaired_dir,
         unpaired_prompt_csv=unpaired_csv,
         unpaired_out_size=128,
         unpaired_crop_type="resize",
@@ -364,7 +354,7 @@ if __name__ == "__main__":
     print("=" * 50)
 
     balanced_dataset = BalancedMixedFadingDataset(
-        unpaired_image_folder=unpaired_dir,
+        unpaired_image_dir=unpaired_dir,
         unpaired_prompt_csv=unpaired_csv,
         unpaired_out_size=128,
         unpaired_crop_type="resize",
