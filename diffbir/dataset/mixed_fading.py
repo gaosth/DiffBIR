@@ -72,6 +72,8 @@ class MixedFadingDataset(Dataset):
             fading_params = {}
 
         # 旧格式参数覆盖（如果设置了的话）
+        if aging_type is not None:
+            fading_params['aging_type'] = aging_type
         if decay_range is not None:
             fading_params['decay_range'] = decay_range
         if darken_strength is not None:
@@ -212,6 +214,8 @@ class BalancedMixedFadingDataset(Dataset):
         if fading_params is None:
             fading_params = {}
 
+        if aging_type is not None:
+            fading_params['aging_type'] = aging_type
         if decay_range is not None:
             fading_params['decay_range'] = decay_range
         if darken_strength is not None:
