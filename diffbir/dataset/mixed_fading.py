@@ -30,9 +30,15 @@ class MixedFadingDataset(Dataset):
         unpaired_prompt_csv: str = None,
         unpaired_out_size: int = 512,
         unpaired_crop_type: str = "resize",
-        # 褪色参数（用于unpaired）
+        # 褪色参数（用于unpaired）- 新格式
         fading_params: dict = None,
         random_fading: bool = True,
+        # 褪色参数（用于unpaired）- 旧格式（兼容）
+        aging_type: str = None,
+        decay_range: tuple = None,
+        darken_strength: float = None,
+        use_brown_overlay: bool = None,
+        overlay_opacity: float = None,
         # Paired数据集参数
         paired_data_root: str = None,
         paired_prompt_csv: str = None,
@@ -60,6 +66,21 @@ class MixedFadingDataset(Dataset):
         """
         self.paired_ratio = paired_ratio
 
+        # 处理褪色参数：支持新旧两种格式
+        # 如果单独的参数被设置，将它们合并到fading_params中
+        if fading_params is None:
+            fading_params = {}
+
+        # 旧格式参数覆盖（如果设置了的话）
+        if decay_range is not None:
+            fading_params['decay_range'] = decay_range
+        if darken_strength is not None:
+            fading_params['darken_strength'] = darken_strength
+        if use_brown_overlay is not None:
+            fading_params['use_brown_overlay'] = use_brown_overlay
+        if overlay_opacity is not None:
+            fading_params['overlay_opacity'] = overlay_opacity
+
         # 初始化unpaired数据集
         self.unpaired_dataset = None
         if unpaired_image_dir is not None and paired_ratio < 1.0:
@@ -68,7 +89,7 @@ class MixedFadingDataset(Dataset):
                 prompt_csv=unpaired_prompt_csv,
                 out_size=unpaired_out_size,
                 crop_type=unpaired_crop_type,
-                fading_params=fading_params,
+                fading_params=fading_params if fading_params else None,
                 random_fading=random_fading,
             )
             print(f"Unpaired dataset: {len(self.unpaired_dataset)} images")
@@ -159,9 +180,15 @@ class BalancedMixedFadingDataset(Dataset):
         unpaired_prompt_csv: str = None,
         unpaired_out_size: int = 512,
         unpaired_crop_type: str = "resize",
-        # 褪色参数（用于unpaired）
+        # 褪色参数（用于unpaired）- 新格式
         fading_params: dict = None,
         random_fading: bool = True,
+        # 褪色参数（用于unpaired）- 旧格式（兼容）
+        aging_type: str = None,
+        decay_range: tuple = None,
+        darken_strength: float = None,
+        use_brown_overlay: bool = None,
+        overlay_opacity: float = None,
         # Paired数据集参数
         paired_data_root: str = None,
         paired_prompt_csv: str = None,
@@ -181,6 +208,19 @@ class BalancedMixedFadingDataset(Dataset):
         self.paired_ratio = paired_ratio
         self._length = total_samples
 
+        # 处理褪色参数：支持新旧两种格式
+        if fading_params is None:
+            fading_params = {}
+
+        if decay_range is not None:
+            fading_params['decay_range'] = decay_range
+        if darken_strength is not None:
+            fading_params['darken_strength'] = darken_strength
+        if use_brown_overlay is not None:
+            fading_params['use_brown_overlay'] = use_brown_overlay
+        if overlay_opacity is not None:
+            fading_params['overlay_opacity'] = overlay_opacity
+
         # 计算每种数据的样本数
         self.num_paired = int(total_samples * paired_ratio)
         self.num_unpaired = total_samples - self.num_paired
@@ -193,7 +233,7 @@ class BalancedMixedFadingDataset(Dataset):
                 prompt_csv=unpaired_prompt_csv,
                 out_size=unpaired_out_size,
                 crop_type=unpaired_crop_type,
-                fading_params=fading_params,
+                fading_params=fading_params if fading_params else None,
                 random_fading=random_fading,
             )
             print(f"Unpaired dataset: {len(self.unpaired_dataset)} images")
