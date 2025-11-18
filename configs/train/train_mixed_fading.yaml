@@ -1,0 +1,160 @@
+# Stage2训练配置 - 混合褪色图片修复
+# 同时使用unpaired（在线生成褪色）和paired（真实图像对）数据训练
+
+model:
+  cldm:
+    target: diffbir.model.cldm.ControlLDM
+    params:
+      latent_scale_factor: 0.18215
+      unet_cfg:
+        use_checkpoint: True
+        image_size: 32 # unused
+        in_channels: 4
+        out_channels: 4
+        model_channels: 320
+        attention_resolutions: [ 4, 2, 1 ]
+        num_res_blocks: 2
+        channel_mult: [ 1, 2, 4, 4 ]
+        num_head_channels: 64
+        use_spatial_transformer: True
+        use_linear_in_transformer: True
+        transformer_depth: 1
+        context_dim: 1024
+        legacy: False
+      vae_cfg:
+        embed_dim: 4
+        ddconfig:
+          double_z: true
+          z_channels: 4
+          resolution: 256
+          in_channels: 3
+          out_ch: 3
+          ch: 128
+          ch_mult:
+          - 1
+          - 2
+          - 4
+          - 4
+          num_res_blocks: 2
+          attn_resolutions: []
+          dropout: 0.0
+      clip_cfg:
+        embed_dim: 1024
+        vision_cfg:
+          image_size: 224
+          layers: 32
+          width: 1280
+          head_width: 80
+          patch_size: 14
+        text_cfg:
+          context_length: 77
+          vocab_size: 49408
+          width: 1024
+          heads: 16
+          layers: 24
+        layer: "penultimate"
+      controlnet_cfg:
+        use_checkpoint: True
+        image_size: 32 # unused
+        in_channels: 4
+        hint_channels: 4
+        model_channels: 320
+        attention_resolutions: [ 4, 2, 1 ]
+        num_res_blocks: 2
+        channel_mult: [ 1, 2, 4, 4 ]
+        num_head_channels: 64
+        use_spatial_transformer: True
+        use_linear_in_transformer: True
+        transformer_depth: 1
+        context_dim: 1024
+        legacy: False
+
+  diffusion:
+    target: diffbir.model.gaussian_diffusion.Diffusion
+    params:
+      linear_start: 0.00085
+      linear_end: 0.0120
+      timesteps: 1000
+      zero_snr: False
+      parameterization: eps
+
+dataset:
+  train:
+    target: diffbir.dataset.mixed_fading.MixedFadingDataset
+    # 如需精确控制比例，可改用:
+    # target: diffbir.dataset.mixed_fading.BalancedMixedFadingDataset
+    params:
+      # ============ Unpaired数据集参数 ============
+      # 原始图像文件夹（用于在线生成褪色效果）
+      unpaired_image_folder: /path/to/your/unpaired_images
+      unpaired_prompt_csv: /path/to/your/unpaired_prompts.csv
+      unpaired_out_size: 512
+      unpaired_crop_type: resize
+
+      # 褪色效果参数（仅用于unpaired数据）
+      aging_type: random
+      decay_range: [0.85, 0.95]
+      darken_strength: 0.2
+      use_brown_overlay: true
+      overlay_opacity: 0.15
+
+      # ============ Paired数据集参数 ============
+      # 成对图像数据根目录（包含ori/和fixed/）
+      paired_data_root: /path/to/your/paired_data
+      paired_prompt_csv: /path/to/your/paired_prompts.csv
+      paired_out_size: 512
+      paired_crop_type: resize
+      paired_ori_subdir: ori
+      paired_fixed_subdir: fixed
+
+      # ============ 混合参数 ============
+      # paired数据的采样比例
+      #   0.0: 只使用unpaired数据
+      #   1.0: 只使用paired数据
+      #   0.3: 30% paired + 70% unpaired（推荐，让模型学习真实褪色模式）
+      #   0.5: 50% paired + 50% unpaired
+      paired_ratio: 0.3
+
+      # 每个epoch的总样本数
+      # 设为null自动计算为两个数据集长度之和
+      # 建议设置为具体数值以控制训练节奏
+      total_samples: 1000
+
+batch_transform:
+  target: diffbir.dataset.batch_transform.IdentityBatchTransform
+
+train:
+  # Stable Diffusion v2.1预训练权重路径
+  sd_path: /path/to/stable-diffusion-2-1-base/v2-1_512-ema-pruned.ckpt
+
+  # 实验输出目录
+  exp_dir: experiments/mixed_fading_restoration
+
+  # 学习率
+  learning_rate: 1e-4
+
+  # 批次大小
+  batch_size: 4
+
+  # 数据加载workers数量
+  num_workers: 4
+
+  # 训练步数
+  # total_samples=1000, batch_size=4 → 250 steps/epoch
+  # 建议训练20-40 epochs，即5000-10000 steps
+  train_steps: 10000
+
+  # 日志记录间隔
+  log_every: 50
+
+  # checkpoint保存间隔
+  ckpt_every: 1000
+
+  # 图像记录间隔
+  image_every: 200
+
+  # 从checkpoint恢复训练（可选）
+  resume: ~
+
+  # 条件噪声增强时间步
+  noise_aug_timestep: 0
